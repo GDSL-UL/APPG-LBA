@@ -126,4 +126,9 @@ venv.bak/
 dmypy.json
 
 # Pyre type checker
-.pyre/
+.pyre
+
+data/clc/
+data/lsoa/
+data/lsoa_clustered.gpkg
+data/clustering_phase_1/

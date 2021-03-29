@@ -132,3 +132,4 @@ data/clc/
 data/lsoa/
 data/lsoa_clustered.gpkg
 data/clustering_phase_1/
+static_carto.gpkg

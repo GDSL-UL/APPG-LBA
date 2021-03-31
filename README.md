@@ -1,5 +1,7 @@
 # What do ‘left behind’ areas look like over time?
 
+[![DOI](https://zenodo.org/badge/341187041.svg)](https://zenodo.org/badge/latestdoi/341187041)
+
 Developing place-based typologies of left behind areas
 
 **Dr Frances Darlington-Pollock, Dr Dani Arribas-Bel, Dr Martin Fleischmann, Niall Newsham, Dr Francisco Rowe**

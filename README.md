@@ -16,7 +16,9 @@ The resulting trajectories of change are available as an interactive map [here](
 The results are available as an open data product for download from the `open_data` folder.
 
 ---
+Licensing:
 
 LSOA geometry:
 Source: Office for National Statistics licensed under the Open Government Licence v.3.0; Contains OS data © Crown copyright and database right 2021
+
 CORINE Land Cover: © European Environment Agency

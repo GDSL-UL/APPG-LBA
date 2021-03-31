@@ -1,0 +1,236 @@
+---
+title: "Sequence Analysis"
+author: "Niall Newsham"
+date: "31/03/2021"
+output: html_document
+---
+
+Load required packages
+```{r}
+library(TraMineR) #for sequence analysis
+library(cluster) #for cluster analysis
+library(WeightedCluster) #for cluster analysis
+library(tidyverse) #for data formatting
+```
+
+Read in the file containing land use data
+```{r}
+clusters12 <- read.csv("C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/lsoa_12clusters.eng.csv")
+```
+
+Change land use cluster codes to labels
+```{r}
+clusters12[clusters12=="0"]<-"Neighbourhoods with parks"
+clusters12[clusters12=="1"]<-"Neighbourhoods near countryside"
+clusters12[clusters12=="2"]<-"Mixed countryside"
+clusters12[clusters12=="3"]<-"Agricultural land"
+clusters12[clusters12=="4"]<-"Dense central neighbourhoods"
+clusters12[clusters12=="5"]<-"Noncentral neighbourhoods"
+clusters12[clusters12=="6"]<-"Industrial and commercial neighbourhoods"
+clusters12[clusters12=="7"]<-"Rural neighbourhoods"
+clusters12[clusters12=="8"]<-"Noncentral mixed neighbourhoods"
+clusters12[clusters12=="9"]<-"Pastures"
+clusters12[clusters12=="10"]<-"Farmlands"
+clusters12[clusters12=="11"]<-"Neighbourhoods nearby golf & other leisure"
+```
+
+tidyverse formatting. Create id column.
+```{r}
+clusters12 <- clusters12 %>% 
+  select(-c(X)) %>% 
+  mutate(id = row_number()) %>% 
+  relocate(id)
+```
+
+Create a new column showing the sequences, this will be used later in the sequence analysis.
+```{r}
+clusters12$sequence <- paste (clusters12$clusters_12_2000, clusters12$clusters_12_2006, clusters12$clusters_12_2012, clusters12$clusters_12_2018, sep="-")
+```
+
+We are interested in LSOAs that change land use, so we will work with those only. First we create a binary variable indicating whether sequences change or not
+```{r}
+clusters12 %>% 
+  mutate(change = case_when(
+    clusters_12_2000 != clusters_12_2006 ~ "1",
+    clusters_12_2000 != clusters_12_2012 ~ "1",
+    clusters_12_2000 != clusters_12_2018 ~ "1")
+  ) -> clusters12
+```
+
+we then filter out those that have not changed
+```{r}
+clusters12_change <- clusters12 %>% 
+  filter(change == 1)
+```
+
+## Sequence Analysis 
+
+First we define the sequence alphabet.
+```{r}
+alph <- c("Dense central neighbourhoods","Noncentral neighbourhoods",
+               "Noncentral mixed neighbourhoods","Neighbourhoods with parks",
+                "Rural neighbourhoods","Neighbourhoods near countryside",
+               "Industrial and commercial neighbourhoods","Neighbourhoods nearby golf & other leisure", 
+                "Mixed countryside","Agricultural land","Pastures","Farmlands")
+
+
+scode <- c("DCN","NcN","NcMN","NwP","RUR","NnC", "IND","NnL","MC","AG","P", "FARM")
+```
+
+We then create the sequence object, specifying the values
+```{r}
+seq.c12 <- seqdef(clusters12_change$sequence, alphabet = alph, states = scode, cnames = c("2000", "2006", "2012", "2018"))
+```
+
+Next, we calculate the unique distance matrix using Dynamic Hamming Distances (DHD)
+```{r}
+seq.c12.DHD <- seqdist(seq.c12,
+                       method = "DHD")
+```
+
+The next step involves clustering LSOAs based on their sequence similarity. First, we empirically test the performance of various cluster solutions.
+```{r}
+# PAM clustering
+for (i in 6:15) {
+  pamwardclust <- wcKMedoids(seq.c12.DHD, k= i)
+  print(paste("number of k =", i,": Average Silhouette Width (weighted) is" , pamwardclust$stats[5]))
+}
+```
+from this we will explore the solutions k = 11-12
+
+PAM clustering
+```{r}
+pamwardclust11 <- wcKMedoids(seq.c12.DHD, k = 11)
+pamwardclust12 <- wcKMedoids(seq.c12.DHD, k = 12)
+```
+
+Calculate silouette scores to use later in graphs
+```{r}
+sil.k11 <- wcSilhouetteObs(seq.c12.DHD, pamwardclust11$clustering, measure="ASWw")
+sil.k12 <- wcSilhouetteObs(seq.c12.DHD, pamwardclust12$clustering, measure="ASWw")
+```
+
+## Plots
+
+Before visualising the cluster solutions, we define the labels for the plots
+
+```{r}
+labs <-  c("Dense central neighbourhoods","Noncentral neighbourhoods",
+           "Noncentral mixed neighbourhoods","Neighbourhoods with parks",
+           "Rural neighbourhoods","Neighbourhoods near countryside",
+           "Industrial and commercial neighbourhoods","Neighbourhoods nearby golf & other leisure", 
+           "Mixed countryside","Agricultural land","Pastures","Farmlands")
+```
+
+Create sequence index plots
+
+```{r, eval=FALSE}
+#not run, figure is too large
+seqIplot(seq.c12, 
+         group = pamwardclust11$clustering,
+         sortv= sil.k11,
+         ltext = labs,
+         cex.legend = 1,
+         cex.axis=1,
+         border =NA)
+
+seqIplot(seq.c12, 
+         group = pamwardclust12$clustering,
+         sortv= sil.k12,
+         ltext = labs,
+         cex.legend = 1,
+         cex.axis=1,
+         border =NA)
+dev.off()
+```
+
+We decide that K=11 is the most appropriate number of clusters. To save the Sequence Index plots:
+
+```{r}
+mypath <- file.path("C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/change only lsoa/DHD/12clusters/",
+                    paste("seqiplot.c12.k11.jpg", sep = ""))
+
+jpeg(file=mypath, width = 1500, height = 1500)
+seqIplot(seq.c12, 
+         group = pamwardclust11$clustering,
+         sortv= sil.k11,
+         ltext = labs,
+         cex.legend = 1,
+         cex.axis=1,
+         border =NA)
+dev.off()
+```
+
+
+## TRANSITION RATES
+
+To extract transition rates for all LSOAs:
+```{r}
+#Create sequence object for all LSOAs (including those that change)
+seq.c12.all <- seqdef(clusters12$sequence, alphabet = alph, states = scode, cnames = c("2000", "2006", "2012", "2018"))
+
+#examine transition rates
+tr_rates.all <- seqtrate(seq.c12.all, time.varying = TRUE)
+tr_rates.all <- round(tr_rates.all,3)
+
+#save them
+write.csv(tr_rates.all, "C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/change only lsoa/DHD/12clusters/trates.all.eng.csv")
+
+```
+
+Transition rates for Left Behind LSOAs:
+
+```{r}
+#read in left behind areas file
+LB <- read.csv("C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/Left Behind/leftbehindLSOA.eng.csv")
+
+#recode N/As to 0
+LB <- LB %>% 
+  mutate_all(~replace(., is.na(.), 0))
+
+#record Left.Behind column to factor
+LB$Left.Behind <- as.factor(LB$Left.Behind)
+
+#merge with Clusters12 data frame
+LB.merge.c12 <- merge(x = LB,
+                      y = clusters12,
+                      by.x = "LSOA11CD",
+                      by.y = "LSOA11CD",
+                      all.x = TRUE)
+
+#we are interested in those sequences that are left behind, so we will work with those only. 
+LB.merge.c12 <- LB.merge.c12 %>% 
+  filter(Left.Behind == 1)
+
+#create sequence object
+seq.c12.LB <- seqdef(LB.merge.c12$sequence, alphabet = alph, states = scode, cnames = c("2000", "2006", "2012", "2018"))
+
+#examine transition rates
+tr_rates <- seqtrate(seq.c12.LB, time.varying = TRUE)
+tr_rates <- round(tr_rates,3)
+#save them
+write.csv(tr_rates, "C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/change only lsoa/DHD/12clusters/lb.trates.eng.csv")
+```
+
+Transition rates for non-left behind LSOAs
+```{r}
+#merge with Clusters12 data frame
+NLB.merge.c12 <- merge(x = LB,
+                      y = clusters12,
+                      by.x = "LSOA11CD",
+                      by.y = "LSOA11CD",
+                      all.x = TRUE)
+
+#filter out left behind LSOAs
+NLB.merge.c12 <- NLB.merge.c12 %>% 
+  filter(Left.Behind != 1)
+
+#create sequence object
+seq.c12.NLB <- seqdef(NLB.merge.c12$sequence, alphabet = alph, states = scode, cnames = c("2000", "2006", "2012", "2018"))
+
+#examine transition rates
+tr_rates <- seqtrate(seq.c12.NLB, time.varying = TRUE)
+tr_rates <- round(tr_rates,3)
+#save them
+write.csv(tr_rates, "C:/Users/nnewsh/Documents/PhD/Projects/APPG_LBA/Left Behind/NLB_TR_rates_c12.csv")
+```

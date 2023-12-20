@@ -16,7 +16,6 @@ The resulting static classification is available as an interactive map [here](ht
 The resulting trajectories of change are available as an interactive map [here](https://nnewsh.carto.com/builder/63ed77b1-3b7d-4398-898d-10e4765bedec/embed).
 
 The results are available as an open data product for download from the `open_data` folder.
-
 ---
 Licensing:
 
